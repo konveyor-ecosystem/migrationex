@@ -3,8 +3,10 @@
 A simple **Java 8-based** web application that allows users to manage a collection of books.
 
 ## Features
-- **View all books** (`GET /library`)
-- **Add new books** (`POST /library`)
+- **View all books** 
+- **Add new books**
+- **Find books by title**
+- **Delete books**
 
 ## 1. Prerequisites
 Make sure you have:
@@ -34,17 +36,8 @@ $TOMCAT_HOME/bin/startup.sh
 
 ## 4. Usage
 
-View Books (GET Request)
-Open a browser or use curl:
+Open a browser:
 
 ```
-http://localhost:8080/migrationex/library
-```
-or
-```
-curl http://localhost:8080/migrationex/library
-```
-Add a New Book (POST Request)
-```
-curl -X POST -d "title=Clean Code&author=Robert Martin" http://localhost:8080/migrationex/library
+http://localhost:8080/migrationex
 ```
