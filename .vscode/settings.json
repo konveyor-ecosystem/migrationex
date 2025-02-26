@@ -1,0 +1,7 @@
+{
+    "konveyor.analysis.customRules": [
+        "/Users/sraghuna/local_dev/rules"
+    ],
+    "konveyor.analysis.useDefaultRulesets": true,
+    "konveyor.analysis.labelSelector": "(konveyor.io/target=jakarta-ee || konveyor.io/target=openjdk11 || konveyor.io/target=openjdk17) || (discovery)"
+}

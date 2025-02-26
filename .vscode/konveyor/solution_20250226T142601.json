@@ -1,0 +1,7 @@
+{
+  "encountered_errors": [],
+  "modified_files": [
+    "/Users/sraghuna/local_dev/migrationex/src/main/java/com/konveyor/Library.java"
+  ],
+  "diff": "diff --git a/src/main/java/com/konveyor/Library.java b/src/main/java/com/konveyor/Library.java\nindex 92abfc1..0f0da47 100644\n--- a/src/main/java/com/konveyor/Library.java\n+++ b/src/main/java/com/konveyor/Library.java\n@@ -1,10 +1,9 @@\n package com.konveyor;\n \n-\n import java.io.IOException;\n import java.util.*;\n import java.security.*;\n-import sun.misc.BASE64Encoder;\n+import java.util.Base64; // Updated import for Base64\n import javax.servlet.http.HttpServletResponse;\n \n public class Library {\n@@ -36,13 +35,11 @@ public class Library {\n         }\n     }\n \n-\n     private String generateHash(String input) {\n         try {\n-            MessageDigest md5Digest = MessageDigest.getInstance(\"MD5\"); \n-            byte[] hash = md5Digest.digest(input.getBytes());\n-            BASE64Encoder encoder = new BASE64Encoder(); \n-            return encoder.encode(hash);\n+            MessageDigest sha256Digest = MessageDigest.getInstance(\"SHA-256\"); // Updated to SHA-256\n+            byte[] hash = sha256Digest.digest(input.getBytes());\n+            return Base64.getEncoder().encodeToString(hash); // Updated to use Base64 from java.util\n         } catch (NoSuchAlgorithmException e) {\n             e.printStackTrace();\n             return null;\n"
+}
