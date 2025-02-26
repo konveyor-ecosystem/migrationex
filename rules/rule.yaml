@@ -1,0 +1,32 @@
+- ruleID: java-custom-security-00001
+  category: mandatory
+  effort: 2
+  labels:
+  - konveyor.io/source=java8
+  - konveyor.io/source=openjdk
+  - konveyor.io/target=openjdk17
+  when:
+    and:
+      - java.referenced:
+          pattern: java.security.MessageDigest.getInstance
+          location: METHOD_CALL
+      - builtin.filecontent:
+          pattern: 'MessageDigest.getInstance\("MD5"\)'
+  description: Do not use MD5 for hashing due to security vulnerabilities.
+  message: |
+    The MD5 algorithm is **outdated** and should not be used for secure hashing.
+    Instead, use **SHA-256** or **SHA-512**.
+
+    **Fix:**
+    ```java
+    // Deprecated MD5 usage
+    MessageDigest md = MessageDigest.getInstance("MD5");
+
+    // Recommended SHA-256 usage
+    MessageDigest md = MessageDigest.getInstance("SHA-256");
+    ```
+  links:
+  - title: 'java ref'
+    url: https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/security/MessageDigest.html
+  - title: 'MD5'
+    url: https://csrc.nist.gov/projects/hash-functions
