@@ -9,7 +9,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 public class LibraryServlet extends HttpServlet {
-  private static final long serialVersionUID = 1 L;
+  private static final long serialVersionUID = 1L;
   private Library library = new Library();
 
   @Override
