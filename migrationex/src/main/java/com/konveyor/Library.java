@@ -4,8 +4,8 @@ package com.konveyor;
 import java.io.IOException;
 import java.util.*;
 import java.security.*;
-import sun.misc.BASE64Encoder;
-import javax.servlet.http.HttpServletResponse;
+import java.util.Base64;
+import jakarta.servlet.http.HttpServletResponse;
 
 public class Library {
     private Map<String, Book> books = new HashMap<>();
@@ -39,10 +39,9 @@ public class Library {
 
     private String generateHash(String input) {
         try {
-            MessageDigest md5Digest = MessageDigest.getInstance("MD5"); 
-            byte[] hash = md5Digest.digest(input.getBytes());
-            BASE64Encoder encoder = new BASE64Encoder(); 
-            return encoder.encode(hash);
+            MessageDigest digest = MessageDigest.getInstance("SHA-256"); 
+            byte[] hash = digest.digest(input.getBytes());
+            return Base64.getEncoder().encodeToString(hash);
         } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
             return null;
