@@ -1,6 +1,6 @@
 # Simple Library
 
-A simple **Java 8-based** web application that allows users to manage a collection of books.
+A simple **Java 17-based** web application that allows users to manage a collection of books.
 
 ## Features
 - **View all books** 
@@ -10,8 +10,8 @@ A simple **Java 8-based** web application that allows users to manage a collecti
 
 ## 1. Prerequisites
 Make sure you have:
-- **Java 8** (Ensure `java -version` outputs Java 8)
-- **Apache Tomcat 9+** that uses java 8 
+- **Java 17** (Ensure `java -version` outputs Java 17)
+- **Apache Tomcat 9+** that uses java 17 
 - **Maven 3+** (Ensure `mvn -version` works)
 
 ## 2. Build the Application
