@@ -1,0 +1,192 @@
+name: Modernisation Java assistée par Codex
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: Tâche unique à traiter
+        required: true
+        type: choice
+        options:
+          - 00-baseline-audit
+          - 01-java17-target
+          - 02-removed-java-apis
+          - 03-maven-dependencies
+          - 04-javax-jakarta-assessment
+
+permissions: {}
+
+concurrency:
+  group: modernization-${{ github.ref }}-${{ inputs.task }}
+  cancel-in-progress: false
+
+jobs:
+  codex:
+    name: Proposition Codex
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout sans identifiants persistants
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Valider l’identifiant fermé
+        shell: bash
+        env:
+          TASK_ID: ${{ inputs.task }}
+        run: |
+          if [[ "$GITHUB_REPOSITORY" != 'lucieb09/migrationex' ]]; then
+            echo 'Workflow interdit hors du fork lucieb09/migrationex' >&2
+            exit 1
+          fi
+          case "$TASK_ID" in
+            00-baseline-audit|01-java17-target|02-removed-java-apis|03-maven-dependencies|04-javax-jakarta-assessment) ;;
+            *) echo "Tâche non autorisée" >&2; exit 1 ;;
+          esac
+          test -f "modernization/tasks/$TASK_ID.md"
+
+      - name: Codex — proposition limitée
+        uses: openai/codex-action@v1.13
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          permission-profile: ":workspace"
+          safety-strategy: drop-sudo
+          prompt-file: modernization/prompt.md
+          output-file: ${{ runner.temp }}/codex-final-message.md
+        env:
+          TASK_ID: ${{ inputs.task }}
+
+      - name: Préparer le patch pour vérification séparée
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/handoff"
+          git add -N -- .
+          git diff --binary --no-ext-diff HEAD -- . > "$RUNNER_TEMP/handoff/modernization.patch"
+          cp "$RUNNER_TEMP/codex-final-message.md" "$RUNNER_TEMP/handoff/codex-final-message.md"
+
+      - name: Transmettre diff et résumé
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: modernization-handoff-${{ github.run_id }}
+          path: ${{ runner.temp }}/handoff/
+          if-no-files-found: error
+          retention-days: 7
+
+  verification:
+    name: Vérification sans secret
+    needs: codex
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout sans identifiants persistants
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Récupérer la proposition
+        uses: actions/download-artifact@v8.0.2
+        with:
+          name: modernization-handoff-${{ github.run_id }}
+          path: ${{ runner.temp }}/handoff
+
+      - name: Appliquer le diff proposé
+        shell: bash
+        run: |
+          patch="$RUNNER_TEMP/handoff/modernization.patch"
+          if [[ -s "$patch" ]]; then
+            git apply --check "$patch"
+            git apply "$patch"
+          fi
+
+      - name: Installer Java 17
+        uses: actions/setup-java@v6.3.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Compiler et tester
+        id: verify
+        continue-on-error: true
+        working-directory: migrationex
+        shell: bash
+        run: |
+          set +e
+          {
+            echo '$ java -version'
+            java -version
+            echo
+            echo '$ mvn -version'
+            mvn -version
+            echo
+            echo '$ mvn -B clean verify'
+            mvn -B clean verify
+          } 2>&1 | tee "$RUNNER_TEMP/verification.log"
+          result=${PIPESTATUS[0]}
+          echo "exit_code=$result" >> "$GITHUB_OUTPUT"
+          exit "$result"
+
+      - name: Rédiger le compte rendu
+        if: always()
+        env:
+          TASK_ID: ${{ inputs.task }}
+          VERIFY_OUTCOME: ${{ steps.verify.outcome }}
+          VERIFY_EXIT_CODE: ${{ steps.verify.outputs.exit_code }}
+          SOURCE_SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os
+          import pathlib
+          import subprocess
+
+          def git(*args):
+              return subprocess.run(["git", *args], check=False, capture_output=True, text=True).stdout.strip()
+
+          root = pathlib.Path(os.environ["GITHUB_WORKSPACE"])
+          log = pathlib.Path(os.environ["RUNNER_TEMP"], "verification.log")
+          codex = pathlib.Path(os.environ["RUNNER_TEMP"], "handoff", "codex-final-message.md")
+          changed = git("status", "--short")
+          tests = sorted(str(p.relative_to(root)) for p in root.glob("**/src/test/**/*.java"))
+          report = [
+              "# Compte rendu de modernisation", "",
+              f"- Tâche : {os.environ.get('TASK_ID', 'inconnue')}",
+              f"- Commit source : {os.environ.get('SOURCE_SHA', 'inconnu')}",
+              f"- Exécution Actions : {os.environ.get('RUN_ID', 'inconnue')}",
+              f"- Vérification Maven : {os.environ.get('VERIFY_OUTCOME', 'non exécutée')} (code {os.environ.get('VERIFY_EXIT_CODE', 'inconnu')})",
+              "", "## Fichiers modifiés", "", changed or "Aucun changement détecté.",
+              "", "## Commandes exécutées", "", "- java -version", "- mvn -version",
+              "- mvn -B clean verify (depuis migrationex/)", "",
+              "## Tests découverts", "",
+              "\n".join(f"- {p}" for p in tests) if tests else "Aucun fichier de test Java détecté.",
+              "", "## Résultats, échecs et points à vérifier", "",
+              "Voir verification.log. Le code Maven est consigné ci-dessus; les échecs restent des échecs.",
+              "", "## Résumé Codex", "",
+              codex.read_text(encoding="utf-8") if codex.exists() else "Message Codex indisponible.", ""
+          ]
+          (root / "MODERNIZATION-REPORT.md").write_text("\n".join(report), encoding="utf-8")
+          (root / "verification.log").write_text(log.read_text(encoding="utf-8", errors="replace") if log.exists() else "Vérification Maven sans log.\n", encoding="utf-8")
+          PY
+
+      - name: Publier le rapport et les logs
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: modernization-report-${{ inputs.task }}-${{ github.run_id }}
+          path: |
+            MODERNIZATION-REPORT.md
+            verification.log
+            ${{ runner.temp }}/handoff/modernization.patch
+            ${{ runner.temp }}/handoff/codex-final-message.md
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Propager un échec de vérification
+        if: steps.verify.outcome == 'failure'
+        shell: bash
+        run: exit 1
